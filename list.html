@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inventory</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="topnav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="sell.html">Sell</a>
+        <a href="list.html">Inventory</a>
+        <a href="sales.html">Sales</a>
+    </div>
+
+    <h1>Inventory Manager</h1>
+
+    <input id="itemName" placeholder="Item Name">
+    <input id="itemQty" type="number" placeholder="Qty">
+    <input id="itemPrice" type="number" placeholder="Price">
+
+    <select id="itemCategory">
+        <option>Drinks</option>
+        <option>Snacks</option>
+        <option>Dairy</option>
+        <option>Grocery</option>
+    </select>
+
+    <button onclick="addItem()">Add Item</button>
+
+    <h2>Stock List</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+body{
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #eef2f7, #dfe9f3);
+    margin:0;
+    padding:20px;
+}
+
+/* MAIN CONTAINER */
+.container{
+    max-width:1200px;
+    margin:auto;
+    background:#ffffff;
+    padding:25px;
+    border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* NAVBAR */
+.topnav{
+    background:#1f2937;
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:20px;
+    display:flex;
+    gap:15px;
+    flex-wrap:wrap;
+}
+
+.topnav a{
+    color:#ffffff;
+    text-decoration:none;
+    padding:8px 14px;
+    border-radius:8px;
+    transition:0.3s;
+    font-weight:500;
+}
+
+.topnav a:hover{
+    background:#3b82f6;
+}
+
+/* INPUTS */
+input, select{
+    padding:10px;
+    margin:6px;
+    border-radius:10px;
+    border:1px solid #d1d5db;
+    outline:none;
+    transition:0.3s;
+}
+
+input:focus, select:focus{
+    border-color:#3b82f6;
+    box-shadow:0 0 5px rgba(59,130,246,0.3);
+}
+
+/* BUTTONS */
+button{
+    padding:10px 16px;
+    margin:6px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    background:#3b82f6;
+    color:white;
+    font-weight:600;
+    transition:0.3s;
+}
+
+button:hover{
+    background:#2563eb;
+    transform:translateY(-2px);
+}
+
+/* DASHBOARD CARDS */
+.dashboard-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:linear-gradient(145deg,#ffffff,#f3f4f6);
+    padding:20px;
+    border-radius:14px;
+    text-align:center;
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+    transition:0.3s;
+}
+
+.card:hover{
+    transform:translateY(-5px);
+}
+
+/* TABLES */
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:15px;
+    overflow:hidden;
+    border-radius:12px;
+}
+
+th{
+    background:#111827;
+    color:white;
+    padding:12px;
+    font-size:14px;
+}
+
+td{
+    padding:12px;
+    border-bottom:1px solid #e5e7eb;
+    text-align:center;
+}
+
+/* ROW HOVER */
+tr:hover{
+    background:#f3f4f6;
+}
+
+/* 🔴 LOW STOCK STYLE (IMPORTANT) */
+.low-stock{
+    background:#fee2e2 !important;
+    color:#b91c1c;
+    font-weight:600;
+}
+
+/* RECEIPT BOX */
+#receipt{
+    margin-top:20px;
+    padding:15px;
+    border-radius:12px;
+    background:#f9fafb;
+    border:1px solid #e5e7eb;
+}
+
+/* SMALL SCREEN */
+@media(max-width:700px){
+    .topnav{
+        flex-direction:column;
+    }
+
+    input{
+        width:100%;
+    }
+}

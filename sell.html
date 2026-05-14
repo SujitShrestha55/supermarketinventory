@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sell</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="topnav">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="sell.html">Sell</a>
+        <a href="list.html">Inventory</a>
+        <a href="sales.html">Sales</a>
+    </div>
+
+    <h1>POS System</h1>
+
+    <input id="search" placeholder="Search..." oninput="searchItems()">
+
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Stock</th>
+                <th>Price</th>
+                <th>Qty</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="sellBody"></tbody>
+    </table>
+
+    <h2>Cart</h2>
+    <table>
+        <tbody id="cartBody"></tbody>
+    </table>
+
+    <h2 id="grandTotal">Total: Rs 0</h2>
+
+    <button onclick="checkout()">Checkout</button>
+
+    <div id="receipt"></div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
