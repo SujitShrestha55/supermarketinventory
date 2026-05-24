@@ -1,53 +1,278 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Inventory</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory — POS</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function(){
+      const t = localStorage.getItem('pos_theme') || 'dark';
+      if (t === 'light') document.documentElement.classList.add('light-early');
+    })();
+  </script>
+  <style>
+    html.light-early body { background: #f0f2f7; }
+
+    /* Add product grid */
+    .list-add-grid {
+      display: grid;
+      grid-template-columns: 2fr 100px 120px 140px auto;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    @media (max-width: 900px) {
+      .list-add-grid { grid-template-columns: 1fr 1fr; }
+      .list-add-grid .btn { grid-column: 1 / -1; width: 100%; justify-content: center; }
+    }
+    @media (max-width: 480px) {
+      .list-add-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
+<div id="toast"></div>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<div class="container">
-
-    <div class="topnav">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="index.html">Sell</a>
-        <a href="list.html">Inventory</a>
-        <a href="sales.html">Sales</a>
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>✏️ Edit Product</h3>
+    <input type="hidden" id="editIndex">
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="form-group">
+        <label>Product Name</label>
+        <input id="editName" placeholder="Name">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label>Quantity</label>
+          <input id="editQty" type="number" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Price (Rs)</label>
+          <input id="editPrice" type="number" placeholder="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select id="editCategory">
+          <option>Drinks</option><option>Snacks</option>
+          <option>Dairy</option><option>Grocery</option>
+        </select>
+      </div>
     </div>
-
-    <h1>Inventory Manager</h1>
-
-    <input id="itemName" placeholder="Item Name">
-    <input id="itemQty" type="number" placeholder="Qty">
-    <input id="itemPrice" type="number" placeholder="Price">
-
-    <select id="itemCategory">
-        <option>Drinks</option>
-        <option>Snacks</option>
-        <option>Dairy</option>
-        <option>Grocery</option>
-    </select>
-
-    <button onclick="addItem()">Add Item</button>
-
-    <h2>Stock List</h2>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Total</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
-
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
 </div>
 
-<script src="script.js"></script>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🛒</div>
+      <div class="sidebar-logo-text">
+        <h2>POS System</h2>
+        <p>Management Suite</p>
+      </div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="theme-toggle-wrap">
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <span class="toggle-icon" id="themeIcon">🌙</span>
+        <span class="toggle-label" id="themeLabel">Dark Mode</span>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </button>
+    </div>
+    <div class="sidebar-footer" id="sidebarUser"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>Inventory</h1>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-meta" id="productCount"></span>
+      </div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- ADD ITEM -->
+      <div class="card" style="margin-bottom:22px;">
+        <div class="section-title" style="margin-bottom:16px;">Add New Product</div>
+        <div class="list-add-grid">
+          <div class="form-group">
+            <label>Product Name</label>
+            <input id="itemName" placeholder="e.g. Coca Cola">
+          </div>
+          <div class="form-group">
+            <label>Quantity</label>
+            <input id="itemQty" type="number" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Price (Rs)</label>
+            <input id="itemPrice" type="number" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="itemCategory">
+              <option>Drinks</option><option>Snacks</option>
+              <option>Dairy</option><option>Grocery</option>
+            </select>
+          </div>
+          <div class="form-group" style="justify-content:flex-end;">
+            <button class="btn btn-primary" onclick="addItem()">＋ Add Item</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILTERS -->
+      <div class="filter-bar">
+        <input id="searchFilter" placeholder="🔍  Search products…" oninput="renderList()">
+        <select id="categoryFilter" onchange="renderList()">
+          <option value="">All Categories</option>
+          <option>Drinks</option><option>Snacks</option>
+          <option>Dairy</option><option>Grocery</option>
+        </select>
+        <select id="stockFilter" onchange="renderList()">
+          <option value="">All Stock</option>
+          <option value="low">Low Stock (&lt;5)</option>
+          <option value="out">Out of Stock</option>
+        </select>
+        <span id="productCount2" style="font-size:11.5px;color:var(--text3);font-family:'JetBrains Mono',monospace;white-space:nowrap;align-self:center;margin-left:auto;"></span>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Product</th><th>Category</th>
+                <th>Qty</th><th>Price</th><th>Value</th>
+                <th>Status</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="auth.js"></script>
+<script>
+  const user = authGuard(['admin']);
+  if (user) {
+    buildSidebar(user);
+
+    function addItem() {
+      const name = document.getElementById('itemName').value.trim();
+      const qty = parseInt(document.getElementById('itemQty').value);
+      const price = parseInt(document.getElementById('itemPrice').value);
+      const category = document.getElementById('itemCategory').value;
+      if (!name || isNaN(qty) || isNaN(price)) { toast('Please fill all fields', 'error'); return; }
+      if (qty < 0 || price < 0) { toast('Qty and price must be positive', 'error'); return; }
+      const products = getProducts();
+      products.push({ name, qty, price, category });
+      saveProducts(products);
+      document.getElementById('itemName').value = '';
+      document.getElementById('itemQty').value = '';
+      document.getElementById('itemPrice').value = '';
+      toast(`${name} added to inventory`);
+      renderList();
+    }
+
+    function renderList() {
+      const products = getProducts();
+      const search = document.getElementById('searchFilter').value.toLowerCase();
+      const cat = document.getElementById('categoryFilter').value;
+      const stock = document.getElementById('stockFilter').value;
+      let filtered = products.map((p, i) => ({ ...p, _i: i }));
+      if (search) filtered = filtered.filter(p => p.name.toLowerCase().includes(search));
+      if (cat) filtered = filtered.filter(p => p.category === cat);
+      if (stock === 'low') filtered = filtered.filter(p => p.qty > 0 && p.qty < 5);
+      if (stock === 'out') filtered = filtered.filter(p => p.qty === 0);
+      const tbody = document.getElementById('tableBody');
+      document.getElementById('productCount').textContent = `${products.length} products`;
+      document.getElementById('productCount2').textContent = `${filtered.length} / ${products.length}`;
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📦</div><p>No products found</p></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = filtered.map((p, idx) => {
+        const statusBadge = p.qty === 0
+          ? `<span class="badge badge-red">Out of Stock</span>`
+          : p.qty < 5
+          ? `<span class="badge badge-yellow">Low Stock</span>`
+          : `<span class="badge badge-green">In Stock</span>`;
+        return `
+          <tr class="${p.qty < 5 ? 'low-stock' : ''}">
+            <td style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px;">${idx + 1}</td>
+            <td style="font-weight:600;color:var(--text);">${p.name}</td>
+            <td><span class="badge badge-blue">${p.category}</span></td>
+            <td style="font-family:'JetBrains Mono',monospace;font-weight:600;">${p.qty}</td>
+            <td style="font-family:'JetBrains Mono',monospace;">Rs ${p.price.toLocaleString()}</td>
+            <td style="font-family:'JetBrains Mono',monospace;color:var(--success);">Rs ${(p.qty * p.price).toLocaleString()}</td>
+            <td>${statusBadge}</td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-ghost btn-sm" onclick="openEdit(${p._i})">✏️ Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteItem(${p._i})" style="margin-left:6px;">🗑</button>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    function deleteItem(i) {
+      const products = getProducts();
+      if (!confirm(`Delete "${products[i].name}"?`)) return;
+      const name = products[i].name;
+      products.splice(i, 1);
+      saveProducts(products);
+      toast(`${name} deleted`);
+      renderList();
+    }
+
+    function openEdit(i) {
+      const p = getProducts()[i];
+      document.getElementById('editIndex').value = i;
+      document.getElementById('editName').value = p.name;
+      document.getElementById('editQty').value = p.qty;
+      document.getElementById('editPrice').value = p.price;
+      document.getElementById('editCategory').value = p.category;
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+    function saveEdit() {
+      const i = parseInt(document.getElementById('editIndex').value);
+      const products = getProducts();
+      products[i].name = document.getElementById('editName').value.trim();
+      products[i].qty = parseInt(document.getElementById('editQty').value);
+      products[i].price = parseInt(document.getElementById('editPrice').value);
+      products[i].category = document.getElementById('editCategory').value;
+      saveProducts(products);
+      closeModal();
+      toast('Product updated');
+      renderList();
+    }
+
+    document.getElementById('editModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    renderList();
+  }
+</script>
 </body>
 </html>
