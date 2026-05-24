@@ -15,7 +15,7 @@ function authLogin(id, pass) {
 
 function authLogout() {
   sessionStorage.removeItem('pos_user');
-  window.location.href = 'login.html';
+  window.location.href = 'index.html';
 }
 
 function authGetUser() {
