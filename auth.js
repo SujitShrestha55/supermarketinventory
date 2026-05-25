@@ -1,0 +1,184 @@
+/* ─── AUTH ─── */
+const USERS = [
+  { id: 'admin', password: 'admin123', role: 'admin', name: 'Admin' },
+  { id: 'cashier', password: 'cash123', role: 'cashier', name: 'Cashier' }
+];
+
+function authLogin(id, pass) {
+  const user = USERS.find(u => u.id === id && u.password === pass);
+  if (user) {
+    sessionStorage.setItem('pos_user', JSON.stringify({ id: user.id, role: user.role, name: user.name }));
+    return user;
+  }
+  return null;
+}
+
+function authLogout() {
+  sessionStorage.removeItem('pos_user');
+  window.location.href = 'index.html';
+}
+
+function authGetUser() {
+  const raw = sessionStorage.getItem('pos_user');
+  return raw ? JSON.parse(raw) : null;
+}
+
+function authGuard(allowedRoles) {
+  const user = authGetUser();
+  if (!user) { window.location.href = 'index.html'; return null; }
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    window.location.href = user.role === 'cashier' ? 'sell.html' : 'dashboard.html';
+    return null;
+  }
+  return user;
+}
+
+/* ─── THEME ─── */
+(function applyThemeEarly() {
+  const saved = localStorage.getItem('pos_theme') || 'dark';
+  if (saved === 'light') document.documentElement.classList.add('light-early');
+})();
+
+function initTheme() {
+  const saved = localStorage.getItem('pos_theme') || 'dark';
+  if (saved === 'light') document.body.classList.add('light');
+  else document.body.classList.remove('light');
+  document.documentElement.classList.remove('light-early');
+  updateThemeToggle(saved === 'light');
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('pos_theme', isLight ? 'light' : 'dark');
+  updateThemeToggle(isLight);
+}
+
+function updateThemeToggle(isLight) {
+  const icon  = document.getElementById('themeIcon');
+  const label = document.getElementById('themeLabel');
+  if (icon)  icon.textContent  = isLight ? '☀️' : '🌙';
+  if (label) label.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+}
+
+/* ─── SIDEBAR ─── */
+function buildSidebar(user) {
+  const adminLinks = user.role === 'admin' ? `
+    <a class="nav-link" href="dashboard.html" id="nav-dashboard"><span class="icon">🏠</span> Dashboard</a>
+    <a class="nav-link" href="list.html"      id="nav-list"><span class="icon">📦</span> Inventory</a>
+    <a class="nav-link" href="sales.html"     id="nav-sales"><span class="icon">📊</span> Sales Report</a>
+  ` : '';
+  const cashierLinks = `<a class="nav-link" href="sell.html" id="nav-sell"><span class="icon">🧾</span> Point of Sale</a>`;
+
+  const navEl = document.getElementById('sidebarNav');
+  if (navEl) navEl.innerHTML = `<div class="nav-label">Navigation</div>${adminLinks}${cashierLinks}`;
+
+  /* Mark active link */
+  const page = window.location.pathname.split('/').pop().replace('.html','') || 'dashboard';
+  const activeEl = document.getElementById(`nav-${page}`) ||
+                   document.getElementById('nav-dashboard');
+  if (activeEl) activeEl.classList.add('active');
+
+  /* User info */
+  const sidebarUser = document.getElementById('sidebarUser');
+  if (sidebarUser) {
+    sidebarUser.innerHTML = `
+      <div class="user-badge">
+        <div class="user-avatar ${user.role}">${user.name[0]}</div>
+        <div class="user-info"><strong>${user.name}</strong><span>${user.role}</span></div>
+        <button class="logout-btn" onclick="authLogout()" title="Logout">⏻</button>
+      </div>`;
+  }
+
+  initTheme();
+  _initSidebar();
+}
+
+function _initSidebar() {
+  const sidebar   = document.querySelector('.sidebar');
+  const hamburger = document.getElementById('hamburger');
+  const overlay   = document.getElementById('sidebarOverlay');
+  if (!sidebar || !hamburger || !overlay) return;
+
+  /* Clone hamburger to remove any old listeners */
+  const newHamburger = hamburger.cloneNode(true);
+  hamburger.parentNode.replaceChild(newHamburger, hamburger);
+
+  function openSidebar() {
+    sidebar.classList.add('mobile-open');
+    newHamburger.classList.add('open');
+    overlay.style.cssText = 'display:block;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:290;backdrop-filter:blur(3px);pointer-events:auto;';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('mobile-open');
+    newHamburger.classList.remove('open');
+    overlay.style.cssText = 'display:none;';
+    document.body.style.overflow = '';
+  }
+
+  newHamburger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    sidebar.classList.contains('mobile-open') ? closeSidebar() : openSidebar();
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  /* Close sidebar when nav link clicked */
+  document.querySelectorAll('#sidebarNav .nav-link').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const href = this.getAttribute('href');
+      const current = window.location.pathname.split('/').pop();
+      if (!href || href === current) e.preventDefault();
+      closeSidebar();
+    });
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSidebar();
+  });
+}
+
+/* ─── TOAST ─── */
+let _toastTimer;
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  clearTimeout(_toastTimer);
+  el.className = type;
+  el.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : '✕'}</span><span>${msg}</span>`;
+  el.offsetHeight;
+  el.classList.add('show');
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+/* ─── DATA ─── */
+function getProducts() {
+  try { return JSON.parse(localStorage.getItem('pos_products')) || []; }
+  catch(e) { return []; }
+}
+function saveProducts(p) { localStorage.setItem('pos_products', JSON.stringify(p)); }
+function getSales()    {
+  try { return JSON.parse(localStorage.getItem('pos_sales')) || []; }
+  catch(e) { return []; }
+}
+function saveSales(s)  { localStorage.setItem('pos_sales', JSON.stringify(s)); }
+
+/* ─── SEED DEMO DATA (only if no products exist) ─── */
+(function seedDemoData() {
+  if (getProducts().length > 0) return;
+  const demo = [
+    { name: 'Coca Cola',      qty: 50, price: 60,  category: 'Drinks'  },
+    { name: 'Pepsi',          qty: 40, price: 55,  category: 'Drinks'  },
+    { name: 'Sprite',         qty: 35, price: 55,  category: 'Drinks'  },
+    { name: 'Mineral Water',  qty: 80, price: 25,  category: 'Drinks'  },
+    { name: 'Lays Chips',     qty: 30, price: 40,  category: 'Snacks'  },
+    { name: 'Kurkure',        qty: 25, price: 30,  category: 'Snacks'  },
+    { name: 'Biscuits',       qty: 20, price: 35,  category: 'Snacks'  },
+    { name: 'Milk 1L',        qty: 15, price: 120, category: 'Dairy'   },
+    { name: 'Butter 100g',    qty: 10, price: 90,  category: 'Dairy'   },
+    { name: 'Bread',          qty: 12, price: 65,  category: 'Grocery' },
+    { name: 'Rice 1kg',       qty: 3,  price: 150, category: 'Grocery' },
+    { name: 'Sugar 1kg',      qty: 4,  price: 110, category: 'Grocery' },
+  ];
+  saveProducts(demo);
+})();
