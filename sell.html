@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Sell — POS</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+    (function(){
+      const t = localStorage.getItem('pos_theme') || 'dark';
+      if (t === 'light') document.documentElement.classList.add('light-early');
+    })();
+  </script>
+  <style>
+    html.light-early body { background: #f0f2f7; }
+
+    .sell-page-body {
+      display: flex; flex-direction: column; flex: 1;
+      overflow: hidden; padding: 0 !important;
+    }
+    .sell-shell {
+      display: flex; flex: 1; overflow: hidden;
+      height: calc(100vh - var(--topbar-h, 64px));
+      /* Reserve space for the fixed cart panel on desktop */
+      padding-right: 300px;
+    }
+    .sell-products {
+      flex: 1; overflow-y: auto; padding: 16px; min-width: 0;
+    }
+    .sell-filter {
+      display: flex; gap: 10px; margin-bottom: 14px; align-items: center;
+    }
+    .sell-filter input { flex: 1; min-width: 0; }
+    .sell-filter select { flex: 0 0 auto; width: 130px; }
+
+    /* CART PANEL — fixed at body level, right side */
+    .cart-panel {
+      width: 300px;
+      background: var(--surface); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+      /* Desktop: fixed right panel */
+      position: fixed;
+      top: var(--topbar-h, 64px);
+      right: 0;
+      bottom: 0;
+      z-index: 150;
+    }
+    .cart-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .cart-header h3 { font-size: 14px; font-weight: 700; margin: 0; }
+
+    /* Grand total + checkout at TOP */
+    .cart-top-action {
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: var(--surface);
+    }
+    .cart-total-row {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    }
+    .cart-total-label { font-size: 11px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .cart-total-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: var(--success); }
+
+    .cart-items { flex: 1; overflow-y: auto; padding: 10px; }
+
+    .cart-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+      border-radius: 8px; margin-bottom: 4px; background: var(--surface2);
+      animation: cartItemIn 0.2s ease both;
+    }
+    @keyframes cartItemIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+    .cart-item-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .cart-item-qty { font-size: 11px; color: var(--text3); margin-top: 2px; }
+    .cart-item-price { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--success); white-space: nowrap; }
+    .cart-item-remove {
+      background: none; border: none; color: var(--text3); cursor: pointer;
+      font-size: 13px; padding: 3px 6px; border-radius: 4px; transition: 0.15s; flex-shrink: 0;
+    }
+    .cart-item-remove:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+
+    /* CART OVERLAY — always in DOM, click to close */
+    .cart-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+      z-index: 395; display: none;
+    }
+    .cart-overlay.active { display: block; }
+
+    /* Cart FAB */
+    .cart-toggle-btn {
+      display: none; position: fixed; bottom: 24px; right: 20px; z-index: 140;
+      align-items: center; gap: 7px; background: var(--success); color: #fff;
+      border: none; border-radius: 99px; padding: 13px 20px; font-size: 14px;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35); transition: transform 0.15s;
+    }
+    .cart-toggle-btn:active { transform: scale(0.96); }
+    .cart-toggle-btn .cnt {
+      background: rgba(255,255,255,0.3); border-radius: 99px;
+      padding: 2px 7px; font-size: 12px; min-width: 20px; text-align: center;
+    }
+
+    /* Cart close button — only mobile */
+    .cart-close-btn {
+      display: none; background: none; border: none; color: var(--text3);
+      font-size: 20px; cursor: pointer; padding: 2px 8px; border-radius: 6px; line-height: 1;
+    }
+    .cart-close-btn:hover { background: var(--surface2); color: var(--text); }
+
+    /* Table */
+    .table-wrap { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 340px; }
+    thead { background: var(--surface2); }
+    th { padding: 10px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+         letter-spacing: 0.06em; color: var(--text3); text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 9px 10px; font-size: 12.5px; color: var(--text); border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    .qty-input {
+      width: 48px; text-align: center; padding: 7px 4px !important;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      border-radius: 6px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text);
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 900px) {
+      .cart-panel { width: 260px; }
+      .sell-shell { padding-right: 260px; }
+    }
+
+    @media (max-width: 640px) {
+      .sell-shell { overflow: visible; height: auto; flex-direction: column; padding-right: 0; }
+      .sell-products { overflow: visible; height: auto; padding: 12px; padding-bottom: 90px; }
+      .sell-filter select { width: 110px; }
+      .cart-toggle-btn { display: flex; }
+      .cart-close-btn { display: flex !important; }
+      .cart-panel {
+        top: 0; right: 0; bottom: 0;
+        width: min(300px, 88vw); z-index: 400;
+        transform: translateX(100%);
+        box-shadow: -4px 0 30px rgba(0,0,0,0.3);
+      }
+      .cart-panel.cart-open { transform: translateX(0); }
+      table { min-width: 300px; }
+      th, td { padding: 8px; font-size: 11.5px; }
+      .qty-input { width: 40px; padding: 5px 3px !important; }
+    }
+
+    @media (max-height: 500px) and (orientation: landscape) {
+      .sell-shell { height: calc(100vh - 48px); }
+      .cart-panel { width: 260px; }
+    }
+  </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- SIDEBAR OVERLAY -->
+<div id="sidebarOverlay" style="
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.5); z-index:200;
+"></div>
+
+<!-- CART OVERLAY -->
+<div id="cartOverlay" class="cart-overlay"></div>
+
+<!-- RECEIPT MODAL -->
+<div class="receipt-modal" id="receiptModal">
+  <div class="receipt-box">
+    <h3>🧾 Sale Complete</h3>
+    <div class="receipt-sub" id="receiptBillNo"></div>
+    <div id="receiptContent"></div>
+    <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="flex:1;min-width:120px;" onclick="closeReceipt()">Close</button>
+      <button class="btn btn-primary" style="flex:1;min-width:120px;" onclick="printReceipt()">🖨 Print</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-shell">
+  <aside class="sidebar" id="mainSidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🛒</div>
+      <div class="sidebar-logo-text">
+        <h2>POS System</h2>
+        <p>Management Suite</p>
+      </div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="theme-toggle-wrap">
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <span class="toggle-icon" id="themeIcon">🌙</span>
+        <span class="toggle-label" id="themeLabel">Dark Mode</span>
+        <div class="toggle-track"><div class="toggle-thumb"></div></div>
+      </button>
+    </div>
+    <div class="sidebar-footer" id="sidebarUser"></div>
+  </aside>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu" type="button">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>Point of Sale</h1>
+      </div>
+      <div class="topbar-right">
+        <span class="topbar-meta" id="topbarDate"></span>
+      </div>
+    </div>
+
+    <!-- Cart FAB -->
+    <button class="cart-toggle-btn" id="cartFAB" type="button">
+      🛒 Cart <span class="cnt" id="cartToggleCount">0</span>
+    </button>
+
+    <div class="page-body sell-page-body">
+      <div class="sell-shell">
+
+        <!-- PRODUCTS -->
+        <div class="sell-products">
+          <div class="sell-filter">
+            <input id="search" placeholder="🔍  Search products…" oninput="searchItems()">
+            <select id="catFilter" onchange="searchItems()">
+              <option value="">All Categories</option>
+              <option>Drinks</option><option>Snacks</option>
+              <option>Dairy</option><option>Grocery</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Product</th><th>Category</th>
+                    <th>Stock</th><th>Price</th>
+                    <th>Qty</th><th>Add</th>
+                  </tr>
+                </thead>
+                <tbody id="sellBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CART PANEL (moved to body level to avoid stacking context) -->
+<div class="cart-panel" id="cartPanel">
+          <div class="cart-header">
+            <h3>🛒 Cart</h3>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span id="cartCount" class="badge badge-blue">0 items</span>
+              <button class="cart-close-btn" id="cartCloseBtn" type="button">✕</button>
+            </div>
+          </div>
+
+          <!-- Grand Total + Checkout at TOP -->
+          <div class="cart-top-action">
+            <div class="cart-total-row">
+              <span class="cart-total-label">Grand Total</span>
+              <span class="cart-total-value" id="grandTotal">Rs 0</span>
+            </div>
+            <button class="btn btn-success" id="checkoutBtn" type="button" style="width:100%;padding:14px;font-size:14px;">
+              ✓ Checkout
+            </button>
+          </div>
+
+          <div class="cart-items" id="cartItems">
+            <div class="empty-state">
+              <div class="empty-icon">🛒</div>
+              <p>Cart is empty</p>
+            </div>
+          </div>
+        </div>
+
+<script src="auth.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  /* ── AUTH ── */
+  const user = authGuard(['admin', 'cashier']);
+  if (!user) return;
+
+  /* ── SIDEBAR + THEME (use shared buildSidebar from auth.js) ── */
+  buildSidebar(user);
+
+  /* ── DATE ── */
+  const isMob = () => window.innerWidth <= 640;
+  function updateDate() {
+    const el = document.getElementById('topbarDate');
+    if (el) el.textContent = new Date().toLocaleDateString('en-US',
+      isMob() ? { month:'short', day:'numeric' } : { weekday:'short', month:'short', day:'numeric' });
+  }
+  updateDate();
+  window.addEventListener('resize', updateDate);
+
+  /* ── CART ── */
+  const cartPanel   = document.getElementById('cartPanel');
+  const cartOverlay = document.getElementById('cartOverlay');
+  const cartFAB     = document.getElementById('cartFAB');
+
+  function openCart() {
+    cartPanel.classList.add('cart-open');
+    cartOverlay.classList.add('active');
+    if (cartFAB) cartFAB.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeCart() {
+    cartPanel.classList.remove('cart-open');
+    cartOverlay.classList.remove('active');
+    if (cartFAB) cartFAB.style.display = '';
+    document.body.style.overflow = '';
+  }
+
+  cartFAB.addEventListener('click', openCart);
+  document.getElementById('cartCloseBtn').addEventListener('click', closeCart);
+  cartOverlay.addEventListener('click', closeCart);
+  document.getElementById('checkoutBtn').addEventListener('click', checkout);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { if (window._closeSidebar) window._closeSidebar(); closeCart(); }
+  });
+
+  /* ── CART STATE ── */
+  let cart = [];
+  let lastBillData = null;
+
+  function renderCart() {
+    const total = cart.reduce((s, c) => s + c.total, 0);
+    document.getElementById('cartCount').textContent = `${cart.length} item${cart.length !== 1 ? 's' : ''}`;
+    document.getElementById('grandTotal').textContent = `Rs ${total.toLocaleString()}`;
+    document.getElementById('cartToggleCount').textContent = cart.length;
+
+    const el = document.getElementById('cartItems');
+    if (cart.length === 0) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🛒</div><p>Cart is empty</p></div>`;
+      return;
+    }
+    el.innerHTML = cart.map((c, i) => `
+      <div class="cart-item">
+        <div style="flex:1;min-width:0;">
+          <div class="cart-item-name">${c.name}</div>
+          <div class="cart-item-qty">× ${c.qty} @ Rs ${c.price.toLocaleString()}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+          <span class="cart-item-price">Rs ${c.total.toLocaleString()}</span>
+          <button class="cart-item-remove" data-idx="${i}" type="button">✕</button>
+        </div>
+      </div>`).join('');
+
+    // Attach remove handlers via event delegation
+    el.querySelectorAll('.cart-item-remove').forEach(btn => {
+      btn.addEventListener('click', function() {
+        cart.splice(parseInt(this.dataset.idx), 1);
+        renderCart();
+      });
+    });
+  }
+
+  /* ── PRODUCTS ── */
+  function searchItems() {
+    const tbody  = document.getElementById('sellBody');
+    const search = document.getElementById('search').value.toLowerCase();
+    const cat    = document.getElementById('catFilter').value;
+    const products = getProducts();
+    let filtered = products.map((p, i) => ({ ...p, _i: i }));
+    if (search) filtered = filtered.filter(p => p.name.toLowerCase().includes(search));
+    if (cat)    filtered = filtered.filter(p => p.category === cat);
+
+    if (products.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📦</div><p>No products.<br><a href="list.html" style="color:var(--accent);">Add products first</a></p></div></td></tr>`;
+      return;
+    }
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🔍</div><p>No products found</p></div></td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filtered.map(p => `
+      <tr>
+        <td style="font-weight:600;color:var(--text);">${p.name}</td>
+        <td><span class="badge badge-blue">${p.category}</span></td>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:600;${p.qty<5?'color:var(--warn);':'color:var(--success);'}">
+          ${p.qty<5?'⚠ ':''}${p.qty}
+        </td>
+        <td style="font-family:'JetBrains Mono',monospace;font-weight:600;">Rs ${p.price.toLocaleString()}</td>
+        <td><input class="qty-input" id="qty-${p._i}" type="number" placeholder="1" min="1" max="${p.qty}"></td>
+        <td><button class="btn btn-primary btn-sm add-btn" data-idx="${p._i}" type="button" ${p.qty===0?'disabled':''}>
+          ${p.qty===0?'Out':'+ Add'}
+        </button></td>
+      </tr>`).join('');
+
+    tbody.querySelectorAll('.add-btn').forEach(btn => {
+      btn.addEventListener('click', function() { addToCart(parseInt(this.dataset.idx)); });
+    });
+  }
+
+  function addToCart(i) {
+    const products = getProducts();
+    const qtyEl = document.getElementById(`qty-${i}`);
+    const qty   = parseInt(qtyEl.value) || 1;
+    if (qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
+    if (qty > products[i].qty) { toast(`Only ${products[i].qty} in stock`, 'error'); return; }
+    const existing = cart.find(c => c.index === i);
+    if (existing) {
+      if (existing.qty + qty > products[i].qty) { toast('Not enough stock', 'error'); return; }
+      existing.qty   += qty;
+      existing.total  = existing.qty * products[i].price;
+    } else {
+      cart.push({ index: i, name: products[i].name, qty, price: products[i].price, total: qty * products[i].price });
+    }
+    qtyEl.value = '';
+    toast(`${products[i].name} added`);
+    renderCart();
+    if (isMob()) openCart();
+  }
+
+  function checkout() {
+    if (cart.length === 0) { toast('Cart is empty', 'error'); return; }
+    const products    = getProducts();
+    const billNo      = Date.now();
+    const totalAmount = cart.reduce((s, c) => s + c.total, 0);
+    cart.forEach(c => { products[c.index].qty -= c.qty; });
+    saveProducts(products);
+    const sales = getSales();
+    const bill  = {
+      billNo,
+      items:   cart.map(c => ({ name: c.name, qty: c.qty, price: c.price, total: c.total })),
+      total:   totalAmount,
+      date:    new Date().toISOString().split('T')[0],
+      cashier: user.name
+    };
+    sales.push(bill);
+    saveSales(sales);
+    lastBillData = bill;
+    cart = [];
+    renderCart();
+    searchItems();
+    closeCart();
+    showReceipt(bill);
+  }
+
+  function showReceipt(bill) {
+    document.getElementById('receiptBillNo').textContent = `Bill #${String(bill.billNo).slice(-8)} · ${bill.date}`;
+    document.getElementById('receiptContent').innerHTML = `
+      <div class="receipt-card">
+        ${bill.items.map(it=>`<div class="receipt-row"><span>${it.name} × ${it.qty}</span><span>Rs ${it.total.toLocaleString()}</span></div>`).join('')}
+        <hr>
+        <div class="receipt-row receipt-total"><span>TOTAL</span><span>Rs ${bill.total.toLocaleString()}</span></div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text3);">Cashier: ${bill.cashier}</div>
+      </div>`;
+    document.getElementById('receiptModal').classList.add('open');
+  }
+
+  window.closeReceipt = function() { document.getElementById('receiptModal').classList.remove('open'); };
+
+  window.printReceipt = function() {
+    if (!lastBillData) return;
+    const b = lastBillData;
+    const win = window.open('', '', 'width=380,height=500');
+    win.document.write(`<html><head><title>Receipt</title><style>
+      body{font-family:'Courier New',monospace;padding:20px;font-size:13px;}
+      h2{text-align:center;}.row{display:flex;justify-content:space-between;margin:6px 0;}
+      hr{border:none;border-top:1px dashed #aaa;margin:12px 0;}
+      .total{font-size:16px;font-weight:bold;}.footer{text-align:center;margin-top:20px;font-size:11px;color:#666;}
+    </style></head><body>
+      <h2>🛒 POS Receipt</h2>
+      <div class="row"><span>Bill:</span><span>#${b.billNo}</span></div>
+      <div class="row"><span>Date:</span><span>${b.date}</span></div>
+      <div class="row"><span>Cashier:</span><span>${b.cashier}</span></div><hr>
+      ${b.items.map(it=>`<div class="row"><span>${it.name} ×${it.qty}</span><span>Rs ${it.total}</span></div>`).join('')}
+      <hr><div class="row total"><span>TOTAL</span><span>Rs ${b.total}</span></div>
+      <div class="footer">Thank you for your purchase!</div>
+    </body></html>`);
+    win.document.close(); win.focus(); win.print();
+  };
+
+  searchItems();
+})();
+</script>
+</body>
+</html>
